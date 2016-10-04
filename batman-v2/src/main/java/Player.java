@@ -1,18 +1,23 @@
 import java.util.*;
 
+import static java.lang.Math.*;
+
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
- **/
-enum State {
+ */
+enum State
+{
     MOVE_ORIGIN,
     FINDY,
     FINDX;
 }
 
-class Player {
+class Player
+{
 
-    public static void main(String args[]) {
+    public static void main(String args[])
+    {
         Scanner in = new Scanner(System.in);
         int W = in.nextInt(); // width of the building.
         int H = in.nextInt(); // height of the building.
@@ -20,220 +25,298 @@ class Player {
         int X0 = in.nextInt();
         int Y0 = in.nextInt(); // top left is zero, zero
 
-        boolean startedFromOrigin = X0 == 0 && Y0 == 0;
-
-        State state = X0 == 0 && Y0 == 0 ? State.FINDY : State.MOVE_ORIGIN;
-
-        StateMachine ymachine = new StateMachine(H);
-        StateMachine xmachine = new StateMachine(W);
-
         System.err.println("W=" + W + ", H=" + H);
+
+        StateMachine sm = new StateMachine(W, H);
 
         // game loop
         while (true) {
             Heat heat = Heat.valueOf(in.next()); // Current distance to the bomb compared to previous distance (COLDER, WARMER, SAME or UNKNOWN)
 
-            switch (state) {
-                case MOVE_ORIGIN:
-                    System.err.println("Go to origin");
-                    X0 = 0;
-                    Y0 = 0;
-                    state = State.FINDY;
-                    break;
+            sm.addPosWithHeat(X0, Y0, heat);
+            sm.findMove();
 
-                case FINDY: {
-                    ymachine.addPos(Y0, heat);
-                    if (ymachine.findMove()) {
-                        System.err.println("Found Y!");
-                        state = State.FINDX;
-                    }
+            Pos move = sm.getMove();
+            X0 = move.getX();
+            Y0 = move.getY();
 
-                    int move = ymachine.getMove();
-                    if (move != Y0) {
-                        Y0 = move;
-                    }
-                    if (state == State.FINDY) {
-                        break;
-                    }
-                }
-
-                case FINDX: {
-                    xmachine.addPos(X0, heat);
-                    if (xmachine.findMove()) {
-                        System.err.println("Found X!");
-                    }
-
-                    int move = xmachine.getMove();
-                    if (move != X0) {
-                        X0 = move;
-                    }
-                }
-            }
             System.out.println(X0 + " " + Y0);
         }
     }
 }
 
-enum Heat {
+enum Heat
+{
     COLDER,
     WARMER,
     SAME,
     UNKNOWN;
 }
 
-class StateMachine {
-//    LinkedList<Integer> poss = new LinkedList<Integer>();
-//    LinkedList<Heat> heats = new LinkedList<Heat>();
+class Pos
+{
+    int x, y;
 
-    LinkedList<Integer> moves = new LinkedList();
-
-    private int positionCount = 0;
-
-    private final int max;
-    private int hmin = 0;
-    private int hmax = 0;
-
-    private int last1offset = 0;
-    private int last2offset = 0;
-    private int last3offset = 0;
-    private int last1pos = -1;
-    private int last2pos = -1;
-    private int last3pos = -1;
-    private Heat last1heat = Heat.UNKNOWN, last2heat = Heat.UNKNOWN;
-
-    public StateMachine(int max) {
-        this.max = max;
-        this.hmax = max - 1;
+    public Pos(int x, int y)
+    {
+        this.x = x;
+        this.y = y;
     }
 
-    public void addPos(int pos, Heat heat) {
-        positionCount++;
-
-        last3pos = last2pos;
-        last2pos = last1pos;
-        last1pos = pos;
-
-        last2heat = last1heat;
-        last1heat = heat;
+    public int getX()
+    {
+        return x;
     }
 
-    public int getMove() {
+    public int getY()
+    {
+        return y;
+    }
+}
+
+class StateMachine
+{
+    LinkedList<Pos> moves = new LinkedList();
+
+    private final int w, h;
+    private int minx, maxx, miny, maxy;
+
+    private int x1, x2, x3;
+    private int y1, y2, y3;
+
+    private Heat heat1 = Heat.UNKNOWN, heat2 = Heat.UNKNOWN;
+
+    boolean foundx = false, foundy = false;
+    boolean ignoredMove = false;
+
+    public StateMachine(int w, int h)
+    {
+        this.w = w;
+        this.h = h;
+        this.maxx = w - 1;
+        this.maxy = h - 1;
+
+        if (maxx - minx == 0) {
+            foundx = true;
+        }
+        if (maxy - miny == 0) {
+            foundy = true;
+        }
+    }
+
+    public void addPosWithHeat(int x, int y, Heat heat)
+    {
+
+        x3 = x2;
+        x2 = x1;
+        x1 = x;
+
+        y3 = y2;
+        y2 = y1;
+        y1 = y;
+
+        heat2 = heat1;
+        heat1 = heat;
+    }
+
+    public Pos getMove()
+    {
         return moves.getLast();
     }
 
-    public boolean findMove() {
-        System.err.printf("last1pos=%d, last1offset=%d, last1heat=%s\n", last1pos, last1offset, last1heat);
-        System.err.printf("last2pos=%d, last2offset=%d, last2heat=%s\n", last2pos, last2offset, last2heat);
-        System.err.printf("last3pos=%d, last3offset=%d\n", last3pos, last3offset);
-        System.err.printf("hmax=%d, hmin=%d, hmax-hmin+1=%d\n", hmax, hmin, hmax - hmin + 1);
+    public boolean findMove()
+    {
+        System.err.println("foundx="+foundx+", foundy="+foundy + ",ignored="+ignoredMove);
+        System.err.printf("[1] x=%-4d, y=%-4d, heat1=%s\n", x1, y1, heat1);
+        System.err.printf("[2] x=%-4d, y=%-4d, heat1=%s\n", x2, y2, heat2);
+        System.err.printf("[3] x=%-4d, y=%-4d\n", x3, y3);
 
-        // First move (second position)
-        if (positionCount == 1) {
-            System.err.println("First move");
-            if (last1pos != 0) {
-                throw new IllegalArgumentException("Wrong start position");
-            }
-            if (max == 1) {
-                System.err.println("To narrow, no need to find!");
-                return addMove(last1pos, 0, true);
-            }
+        System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
+        System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
 
-            last1heat = Heat.UNKNOWN; // reset heat
-            return addMove(hmax, 0, false); // need offset when %2
-        }
+        switch (heat1) {
+            case UNKNOWN: {
 
-        int last1direction = (int) Math.signum(last1pos - last2pos);
-        int last2direction = (int) Math.signum(last2pos - last3pos);
+                int nx = (maxx + minx) - x1;
+                int ny = (maxy + miny) - y1;
 
-        switch (last1heat) {
-            case COLDER: {
-                if (last2heat == Heat.COLDER) {
-                    throw new IllegalStateException("Colder, Colder :-/");
+                if (abs(nx - x1) > abs(ny - y1) && nx != x1) {
+                    return addMove(nx, y1);
                 }
-
-                int middle = middleRounded(last1pos - last1offset, last2pos - last2offset);
-
-                if (last1pos > last2pos) {
-                    hmax = Math.min(hmax, middle);
-                } else if (last1pos < last2pos) {
-                    hmin = Math.max(hmin, middle);
-                }
-
-                int last1elements = hmax - hmin + 1;
-                System.err.printf("COLD: middle=%d, hmin=%d, hmax=%d, last1elements=%d\n", middle, hmin, hmax, last1elements);
-
-                if (last1elements <= 2) { // <- check this
-                    return addMove(last2pos, 0, true); // previous position is actually solution
-                } else {
-                    return addMove(middle, 0, false);
+                else {
+                    return addMove(x1, ny);
                 }
             }
+
             case WARMER: {
+                if (!ignoredMove) {
+                    if (x2 != x1) { // x-move
+                        System.err.println("WARMER: Moved X");
 
-                switch (last2heat) {
-                    case COLDER: {
-                        int last1elements = hmax - hmin + 1;
-                        System.err.printf("WARM <- COLD: hmin=%d, hmax=%d, last1elements=%d\n", hmin, hmax, last1elements);
+                        int midx = middleRounded(x2, x1);
 
-                        if (last1elements <= 3) {
-                            return addMove(last3pos, 0, false);
-                        } else if (last1elements % 2 == 0) {
-                            return addMove(last3pos, last2direction, false);
-                        } else {
-                            return addMove(last3pos, 0, false);
+                        if (x1 > x2) {
+                            minx = Math.max(minx, midx);
+                        }
+                        else if (x1 < x2) {
+                            maxx = Math.min(maxx, midx);
                         }
                     }
-                    case UNKNOWN:
-                    case WARMER: {
-                        int middle = middleRounded(last2pos - last2offset, last1pos - last1offset);
+                    else if (y2 != y1) { // y-move
+                        System.err.println("WARMER: Moved Y");
 
-                        if (last1pos > last2pos) {
-                            hmin = Math.max(hmin, middle);
-                        } else if (last1pos < last2pos) {
-                            hmax = Math.min(hmax, middle);
+                        int midy = middleRounded(y2, y1);
+
+                        if (y1 > y2) {
+                            miny = Math.max(miny, midy);
                         }
-
-                        int last1elements = hmax - hmin + 1;
-                        System.err.printf("WARM <- WARM: middle=%d, hmin=%d, hmax=%d, last1elements=%d\n", middle, hmin, hmax, last1elements);
-
-                        // check distance, if three we should alreay know the solution ?
-                        if (last1elements <= 2) {
-                            return addMove(last1pos, 0, true); // check this
-                        } else if (last1elements % 2 == 0) {
-                            return addMove(middle, last1direction, false);
-                        } else {
-                            return addMove(middle, 0, false);
+                        else if (y1 < y2) {
+                            maxy = Math.min(maxy, midy);
                         }
                     }
                 }
+                ignoredMove = false;
+
+                // what next move ?
+                int nx = (maxx + minx) - x1;
+                int ny = (maxy + miny) - y1;
+
+                System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
+                System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
+                System.err.printf("nx=%d, ny=%d\n", nx, ny);
+
+                if (abs(nx - x1) >= abs(ny - y1) && abs(nx - x1) > 0 && nx >= 0 && nx < w) { // x wider
+                    return addMove(nx, y1);
+
+                }
+                if (abs(nx - x1) <= abs(ny - y1) && abs(ny - y1) > 0 && ny >= 0 && ny < h) { // y wider
+                    return addMove(x1, ny);
+
+                }
+                else { // safe move
+                    ignoredMove = true;
+                    return addMove(minx, miny);
+                }
             }
 
-            case SAME:
-                return addMove((last1pos + last2pos) / 2, 0, true); // final solution
+            case COLDER: {
+                if (!ignoredMove) {
+                    if (x2 != x1) { // x-move
+                        System.err.println("COLDER: Moved X");
+                        int midx = middleRounded(x1, x2);
+
+                        if (x1 > x2) {
+                            maxx = Math.min(maxx, midx);
+                        }
+                        else if (x1 < x2) {
+                            minx = Math.max(minx, midx);
+                        }
+                    }
+                    else if (y2 != y1) { // y-move
+                        System.err.println("COLDER: Moved Y");
+                        int midy = middleRounded(y1, y2);
+
+                        if (y1 > y2) {
+                            maxy = Math.min(maxy, midy);
+                        }
+                        else if (y1 < y2) {
+                            miny = Math.max(miny, midy);
+                        }
+                    }
+                }
+                ignoredMove = false;
+                System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
+                System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
+
+//                switch (heat2) {
+//                    case COLDER: { // move to corner
+//                        System.err.println("COLDER, COLDER -> minx, miny");
+//
+//                        ignoredMove = true;
+//                        return addMove(minx, miny);
+//                    }
+//
+//                    default: {
+                        if (x2 != x1 || foundx == true) { // last move was x -> move y
+                            System.err.println("COLDER, ???: Moved X -> Moving Y");
+                            int ny = (maxy + miny) - y1;
+
+                            System.err.printf("ny=%d\n", ny);
+
+                            if (abs(ny - y1) > 0 && ny >= 0 && ny < h) {
+                                return addMove(x1, ny);
+                            }
+                            else { // safe move
+                                ignoredMove = true;
+                                return addMove(minx, miny);
+                            }
+                        }
+                        else if (y2 != y1 || foundy == true) { // last move was y -> move x
+                            System.err.println("COLDER, ???: Moved Y -> Moving X");
+                            int nx = (maxx + minx) - x1;
+
+                            System.err.printf("nx=%d\n", nx);
+
+                            if (abs(nx - x1) > 0 && nx >= 0 && nx < w) {
+                                return addMove(nx, y1);
+                            }
+                            else { // safe move
+                                ignoredMove = true;
+                                return addMove(minx, miny);
+                            }
+                        }
+//                    }
+//                }
+            }
+
+            case SAME: {
+                if (x2 != x1) { // x-move
+                    int nx = (x2 + x1) / 2;
+                    System.err.println("Found X=" + nx);
+
+                    foundx = true;
+                    minx = nx;
+                    maxx = nx;
+                    ignoredMove = true;
+
+                    return addMove(nx, y1);
+                }
+                else if (y2 != y1) { // y-move
+                    int ny = (x2 + x1) / 2;
+                    System.err.println("Found Y=" + ny);
+
+                    foundy = true;
+                    miny = ny;
+                    maxy = ny;
+                    ignoredMove = true;
+
+                    return addMove(x1, ny);
+                }
+            }
         }
 
         throw new IllegalStateException("No logic applied ?!");
     }
 
-    public int middleRounded(int last2pos, int last1pos) {
+    public int middleRounded(int v2, int v1)
+    {
 
-        return last1pos > last2pos
-                ? (int) Math.ceil((double) (last1pos + last2pos) / 2)
-                : (int) Math.floor((double) (last1pos + last2pos) / 2);
+        return v1 > v2
+               ? (int) Math.ceil((double) (v1 + v2) / 2)
+               : (int) Math.floor((double) (v1 + v2) / 2);
     }
 
-    private boolean addMove(int pos, int offset, boolean found) {
-        int posWithOffset = Math.min(Math.max(0, pos + offset), max - 1);
+    public boolean addMove(int x, int y)
+    {
+        if (x < 0 || x >= w) {
+            throw new IllegalStateException("X out of range?");
+        }
+        if (y < 0 || y >= h) {
+            throw new IllegalStateException("Y out of range?");
+        }
 
-        moves.addLast(posWithOffset);
-
-        last3offset = last2offset;
-        last2offset = last1offset;
-        last1offset = offset;
-
-        System.err.println("Added move: " + posWithOffset + " offset=" + offset + " found=" + found);
-
-        return found;
+        moves.addLast(new Pos(x, y));
+        return false;
     }
 }
 
