@@ -36,7 +36,7 @@ public class StateMachineTest {
 
     @Test
     public void middleTest() {
-        StateMachine sm = new StateMachine(12);
+        StateMachine sm = new StateMachine(12, 10);
 
         assertEquals(5,  sm.middleRounded(11, 0));
         assertEquals(6,  sm.middleRounded(0, 11));
