@@ -24,20 +24,16 @@ class Player {
 
         System.err.println("W=" + W + ", H=" + H);
 
-        BiSection bs = new BiSection(W, H).withStart(X0, Y0);
+        BiSection bs = new BiSection(W - 1, H - 1).withStart(X0, Y0);
 
         // game loop
         while (true) {
             Heat heat = Heat.valueOf(in.next()); // Current distance to the bomb compared to previous distance (COLDER, WARMER, SAME or UNKNOWN)
 
-
-            bs.addHeat(heat, Axis.XY);
-
-//            Pos move = bs.findMove();
-//            X0 = move.getX();
-//            Y0 = move.getY();
-
-            System.out.println(X0 + " " + Y0);
+            bs.addHeat(heat);
+            MovePair move = bs.findMove();
+            System.err.println(move);
+            System.out.println(move.x.v + " " + move.y.v);
         }
     }
 }
@@ -48,273 +44,6 @@ enum Heat {
     SAME,
     UNKNOWN;
 }
-
-class Pos {
-    int x, y;
-
-    public Pos(int x, int y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    public int getX() {
-        return x;
-    }
-
-    public int getY() {
-        return y;
-    }
-}
-
-class StateMachine {
-    LinkedList<Pos> moves = new LinkedList();
-
-    private final int w, h;
-    private int minx, maxx, miny, maxy;
-
-    private int x1, x2, x3;
-    private int y1, y2, y3;
-
-    private Heat heat1 = Heat.UNKNOWN, heat2 = Heat.UNKNOWN;
-
-    boolean foundx = false, foundy = false;
-    boolean ignoredMove = false;
-
-    public StateMachine(int w, int h) {
-        this.w = w;
-        this.h = h;
-        this.maxx = w - 1;
-        this.maxy = h - 1;
-
-        if (maxx - minx == 0) {
-            foundx = true;
-        }
-        if (maxy - miny == 0) {
-            foundy = true;
-        }
-    }
-
-    public void addPosWithHeat(int x, int y, Heat heat) {
-
-        x3 = x2;
-        x2 = x1;
-        x1 = x;
-
-        y3 = y2;
-        y2 = y1;
-        y1 = y;
-
-        heat2 = heat1;
-        heat1 = heat;
-    }
-
-    public Pos getMove() {
-        return moves.getLast();
-    }
-
-    public boolean findMove() {
-        System.err.println("foundx=" + foundx + ", foundy=" + foundy + ",ignored=" + ignoredMove);
-        System.err.printf("[1] x=%-4d, y=%-4d, heat1=%s\n", x1, y1, heat1);
-        System.err.printf("[2] x=%-4d, y=%-4d, heat1=%s\n", x2, y2, heat2);
-        System.err.printf("[3] x=%-4d, y=%-4d\n", x3, y3);
-
-        System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
-        System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
-
-        switch (heat1) {
-            case UNKNOWN: {
-
-                int nx = (maxx + minx) - x1;
-                int ny = (maxy + miny) - y1;
-
-                if (abs(nx - x1) > abs(ny - y1) && nx != x1) {
-                    return addMove(nx, y1);
-                } else {
-                    return addMove(x1, ny);
-                }
-            }
-
-            case WARMER: {
-                if (!ignoredMove) {
-                    if (x2 != x1) { // x-move
-                        System.err.println("WARMER: Moved X");
-
-                        int midx = middleRounded(x2, x1);
-
-                        if (x1 > x2) {
-                            minx = Math.max(minx, midx);
-                        } else if (x1 < x2) {
-                            maxx = Math.min(maxx, midx);
-                        }
-                    } else if (y2 != y1) { // y-move
-                        System.err.println("WARMER: Moved Y");
-
-                        int midy = middleRounded(y2, y1);
-
-                        if (y1 > y2) {
-                            miny = Math.max(miny, midy);
-                        } else if (y1 < y2) {
-                            maxy = Math.min(maxy, midy);
-                        }
-                    }
-                }
-                ignoredMove = false;
-
-                // what next move ?
-                int nx = (maxx + minx) - x1;
-                int ny = (maxy + miny) - y1;
-
-                System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
-                System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
-                System.err.printf("nx=%d, ny=%d\n", nx, ny);
-
-                if (abs(nx - x1) >= abs(ny - y1) && abs(nx - x1) > 0 && nx >= 0 && nx < w) { // x wider
-                    return addMove(nx, y1);
-
-                }
-                if (abs(nx - x1) <= abs(ny - y1) && abs(ny - y1) > 0 && ny >= 0 && ny < h) { // y wider
-                    return addMove(x1, ny);
-
-                } else { // safe move
-                    ignoredMove = true;
-                    return addMove(minx, miny);
-                }
-            }
-
-            case COLDER: {
-                if (!ignoredMove) {
-                    if (x2 != x1) { // x-move
-                        System.err.println("COLDER: Moved X");
-                        int midx = middleRounded(x1, x2);
-
-                        if (x1 > x2) {
-                            maxx = Math.min(maxx, midx);
-                        } else if (x1 < x2) {
-                            minx = Math.max(minx, midx);
-                        }
-                    } else if (y2 != y1) { // y-move
-                        System.err.println("COLDER: Moved Y");
-                        int midy = middleRounded(y1, y2);
-
-                        if (y1 > y2) {
-                            maxy = Math.min(maxy, midy);
-                        } else if (y1 < y2) {
-                            miny = Math.max(miny, midy);
-                        }
-                    }
-                }
-                ignoredMove = false;
-                System.err.printf("minx=%d, maxx=%d\n", minx, maxx);
-                System.err.printf("miny=%d, maxy=%d\n", miny, maxy);
-
-//                switch (heat2) {
-//                    case COLDER: { // move to corner
-//                        System.err.println("COLDER, COLDER -> minx, miny");
-//
-//                        ignoredMove = true;
-//                        return addMove(minx, miny);
-//                    }
-//
-//                    default: {
-                if (x2 != x1 || foundx == true) { // last move was x -> move y
-                    System.err.println("COLDER, ???: Moved X -> Moving Y");
-                    int ny = (maxy + miny) - y1;
-
-                    System.err.printf("ny=%d\n", ny);
-
-                    if (abs(ny - y1) > 0 && ny >= 0 && ny < h) {
-                        return addMove(x1, ny);
-                    } else { // safe move
-                        ignoredMove = true;
-                        return addMove(minx, miny);
-                    }
-                } else if (y2 != y1 || foundy == true) { // last move was y -> move x
-                    System.err.println("COLDER, ???: Moved Y -> Moving X");
-                    int nx = (maxx + minx) - x1;
-
-                    System.err.printf("nx=%d\n", nx);
-
-                    if (abs(nx - x1) > 0 && nx >= 0 && nx < w) {
-                        return addMove(nx, y1);
-                    } else { // safe move
-                        ignoredMove = true;
-                        return addMove(minx, miny);
-                    }
-                }
-//                    }
-//                }
-            }
-
-            case SAME: {
-                if (x2 != x1) { // x-move
-                    int nx = (x2 + x1) / 2;
-                    System.err.println("Found X=" + nx);
-
-                    foundx = true;
-                    minx = nx;
-                    maxx = nx;
-                    ignoredMove = true;
-
-                    return addMove(nx, y1);
-                } else if (y2 != y1) { // y-move
-                    int ny = (x2 + x1) / 2;
-                    System.err.println("Found Y=" + ny);
-
-                    foundy = true;
-                    miny = ny;
-                    maxy = ny;
-                    ignoredMove = true;
-
-                    return addMove(x1, ny);
-                }
-            }
-        }
-
-        throw new IllegalStateException("No logic applied ?!");
-    }
-
-    public int middleRounded(int v2, int v1) {
-
-        return v1 > v2
-                ? (int) Math.ceil((double) (v1 + v2) / 2)
-                : (int) Math.floor((double) (v1 + v2) / 2);
-    }
-
-    public boolean addMove(int x, int y) {
-        if (x < 0 || x >= w) {
-            throw new IllegalStateException("X out of range?");
-        }
-        if (y < 0 || y >= h) {
-            throw new IllegalStateException("Y out of range?");
-        }
-
-        moves.addLast(new Pos(x, y));
-        return false;
-    }
-}
-//
-//enum Axis {
-//    X, Y;
-//}
-
-//class MoveXY
-//{
-//    final int x, y;
-////    Axis axis;
-//    Heat heat;
-//
-//    public MoveXY(int x, int y) //, Axis axis)
-//    {
-//        this.x = x;
-//        this.y = y;
-//    }
-//
-//    public void setHeat(Heat heat) {
-//        this.heat = heat;
-//    }
-//
-//    // No getters
-//}
 
 class Move {
     final int v;
@@ -334,7 +63,7 @@ class Move {
     public Move withSafeMove() {
         this.safeMove = true;
         return this;
-    };
+    }
 
     public void setSafeMove(boolean safeMove) {
         this.safeMove = safeMove;
@@ -383,6 +112,10 @@ class Move {
         this.heat = heat;
         return this;
     }
+
+    public int distance(Move move) {
+        return abs(v - move.v);
+    }
 }
 
 class Bounds {
@@ -392,7 +125,7 @@ class Bounds {
     public Bounds(int max) {
         this.max = max;
         this.lo = 0;
-        this.hi = max - 1;
+        this.hi = max;
     }
 
     public Bounds(int max, int lo, int hi) {
@@ -401,7 +134,7 @@ class Bounds {
         this.hi = hi;
     }
 
-    public int getWindow() {
+    public int size() {
         return hi - lo + 1;
     }
 
@@ -442,7 +175,6 @@ class Bounds {
         if (lo != bounds.lo) return false;
         if (hi != bounds.hi) return false;
         return max == bounds.max;
-
     }
 
     @Override
@@ -469,6 +201,15 @@ class MovePair {
         this.axis = axis;
         this.y = y;
     }
+
+    @Override
+    public String toString() {
+        return "MovePair{" +
+                "\nx=" + x +
+                ", \ny=" + y +
+                ", \naxis=" + axis +
+                '}';
+    }
 }
 
 class BiSection {
@@ -491,11 +232,11 @@ class BiSection {
         return this;
     }
 
-    public BiSection addHeat(Heat heat, Axis axis) {
-        if(axis == Axis.X || axis == Axis.XY) {
+    public BiSection addHeat(Heat heat) {
+        if (last == Axis.X || last == Axis.XY) {
             x[1].setHeat(heat);
         }
-        if(axis == Axis.Y || axis == Axis.XY) {
+        if (last == Axis.Y || last == Axis.XY) {
             y[1].setHeat(heat);
         }
         return this;
@@ -509,16 +250,61 @@ class BiSection {
     }
 
     public MovePair findMove() {
+        outputState();
+
+        MovePair movePair = internalFindMove();
+        last = movePair.axis;
+
+        if (last == Axis.X || last == Axis.XY) {
+            shift(x);
+            x[1] = movePair.x;
+        }
+        if (last == Axis.Y || last == Axis.XY) {
+            shift(y);
+            y[1] = movePair.y;
+        }
+
+//        outputState();
+        return movePair;
+    }
+
+    public MovePair internalFindMove() {
 
         // use result
-        if(last == Axis.X || last == Axis.XY) {
+        if (last == Axis.X || last == Axis.XY) {
             updateBounds(x, xb);
         }
-        if(last == Axis.Y || last == Axis.XY) {
+        if (last == Axis.Y || last == Axis.XY) {
             updateBounds(y, yb);
         }
 
-        return null;
+        Move nx = nextMove(x, xb);
+        Move ny = nextMove(y, yb);
+
+        System.err.println("NextMove X: " + nx);
+        System.err.println("NextMove Y: " + ny);
+
+        if(nx.found && ny.found) {
+            return new MovePair(Axis.XY, nx, ny);
+        }
+        else if (!nx.isSafeMove() && !ny.isSafeMove()) {
+            int xsize = xb.size();
+            int ysize = yb.size();
+
+            if (xsize > ysize) {
+                return new MovePair(Axis.X, nx, y[1]);
+            } else {
+                return new MovePair(Axis.Y, x[1], ny);
+            }
+        } else if (nx.isSafeMove() && !ny.isSafeMove() && !ny.found) {
+            return new MovePair(Axis.Y, x[1], ny);
+
+        } else if (!nx.isSafeMove() && ny.isSafeMove() && !nx.found) {
+            return new MovePair(Axis.X, nx, y[1]);
+
+        } else {
+            return new MovePair(Axis.XY, nx, ny);
+        }
     }
 
     public Bounds updateBounds(Move[] values, Bounds bounds) {
@@ -526,7 +312,7 @@ class BiSection {
         switch (values[1].heat) {
             case COLDER: {
 
-                int mid = middleRounded(values[1].v, values[2].v);
+                int mid = middleOptimalRounded(values[1].v, values[2].v);
                 if (values[1].v > values[2].v) {
                     bounds.updateHi(mid);
                 } else if (values[1].v < values[2].v) {
@@ -538,7 +324,7 @@ class BiSection {
 
             case WARMER: {
 
-                int mid = middleRounded(values[2].v, values[1].v);
+                int mid = middleOptimalRounded(values[2].v, values[1].v);
                 if (values[1].v > values[2].v) {
                     bounds.updateLo(mid);
 
@@ -550,7 +336,7 @@ class BiSection {
             }
 
             case SAME: {
-                int mid = (values[1].v + values[2].v)/2;
+                int mid = (values[1].v + values[2].v) / 2;
 
                 bounds.updateHi(mid);
                 bounds.updateLo(mid);
@@ -560,17 +346,17 @@ class BiSection {
         return bounds;
     }
 
-    public int middleRounded(int v2, int v1) {
+    public int middleOptimalRounded(int v2, int v1) {
 
-        if(v1 > v2) {
-            if(Math.abs(v1 - v2) % 2 == 0) {
-                return (v1 + v2) / 2 + (int)signum(v1 - v2);
+        if (v1 > v2) {
+            if (Math.abs(v1 - v2) % 2 == 0) {
+                return (v1 + v2) / 2 + (int) signum(v1 - v2);
             } else {
                 return (int) Math.ceil((double) (v1 + v2) / 2);
             }
-        } else if(v1 < v2){
-            if(Math.abs(v1 - v2) % 2 == 0) {
-                return (v1 + v2) / 2 + (int)signum(v1 - v2);
+        } else if (v1 < v2) {
+            if (Math.abs(v1 - v2) % 2 == 0) {
+                return (v1 + v2) / 2 + (int) signum(v1 - v2);
             } else {
                 return (int) Math.floor((double) (v1 + v2) / 2);
             }
@@ -581,11 +367,10 @@ class BiSection {
 
     public Move nextMove(Move[] values, Bounds bound) {
 
-        int window = bound.getWindow();
+        int window = bound.size();
         double boundMiddle = bound.getMiddle();
         int boundMiddleInt;
 
-//        NextMoveState state = USE_NV;
         Move value = values[1];
         int v = value.v;
         int nv = -1;
@@ -595,6 +380,8 @@ class BiSection {
         }
 
         if (window % 2 == 0) {
+//            boundMiddleInt = (int)ceil(boundMiddle) != v ? (int)ceil(boundMiddle) : (int)floor(boundMiddle);
+
             if (ceil(boundMiddle) < v) {
                 boundMiddleInt = (int) ceil(boundMiddle);
             } else if (floor(boundMiddle) < v) {
@@ -611,55 +398,43 @@ class BiSection {
         } else if (window % 2 != 0) {
             boundMiddleInt = (int) boundMiddle;
             nv = 2 * boundMiddleInt - v;
-         } else {
+        } else {
             throw new IllegalStateException("Unknown window");
         }
 
-        System.out.println("nv = " + nv);
-
-        if(nv < 0) {
+        // If optimal not found, find second optimal
+        if (nv < 0) {
             int newnw = 2 * (boundMiddleInt + 1) - v;
-            if(bound.hi - boundMiddleInt >= 0.4 * (double)window) {
+            if (bound.hi - boundMiddleInt >= 0.4 * (double) window) {
                 nv = newnw;
             }
-        } else if(nv > bound.max) {
+        } else if (nv > bound.max) {
             int newnw = 2 * (boundMiddleInt - 1) - v;
-            if(boundMiddleInt - bound.lo >= 0.4 * (double)window) {
+            if (boundMiddleInt - bound.lo >= 0.4 * (double) window) {
                 nv = newnw;
             }
         }
 
-        System.out.println("final nv = " + nv);
-
-        if(v == nv) {
-            return new Move(bound.lo, false);
+        if (v == nv) {
+            return new Move(v == bound.lo ? bound.hi : bound.lo);
         }
 
         if (bound.isInMax(nv)) {
             return new Move(nv, false);
         }
 
-        if(v > boundMiddleInt) {
-            return new Move(bound.hi).withSafeMove();
-        } else {
-            return new Move(bound.lo).withSafeMove();
+        return new Move(v > boundMiddleInt ? bound.hi : bound.lo).withSafeMove();
+    }
+
+    private void outputState() {
+        for (int i = 1; i < 3; i++) {
+            System.err.printf("[X%d]: %s\n", i, x[i]);
         }
-
-
-//        if (nv < 0) {
-//            int mid = (0 + v) / 2;
-//            if(mid <= bound.hi) {
-//                return new Move(0, false);
-//            } else {
-//                return new Move(bound.hi, false).withSafeMove();
-//            }
-//        } else { // if (v < boundMiddleInt) {
-//            int mid = (bound.max + v) / 2;
-//            if(mid >= bound.lo) {
-//                return new Move(bound.max, false);
-//            } else {
-//                return new Move(bound.lo, false).withSafeMove();
-//            }
-//        }
-   }
+        for (int i = 1; i < 3; i++) {
+            System.err.printf("[Y%d]: %s\n", i, y[i]);
+        }
+        System.err.println("xb=" + xb);
+        System.err.println("yb=" + yb);
+        System.err.println("lastAxis=" + last);
+    }
 }

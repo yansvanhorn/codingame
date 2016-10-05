@@ -66,38 +66,44 @@ public class BiSectionTest {
     @Test
     public void testNextMoveEvenBound() throws Exception {
         BiSection bs = new BiSection(0, 0);
-        Bounds bound = new Bounds(11, 2, 5);
 
 //        assertEquals(0, bs.nextMove(toMoves(11), new Bounds(11, 2, 5)).v); // <- what to do now ?
 
-        assertEquals(new Move(0), bs.nextMove(toMoves(8), bound));
-        assertEquals(new Move(1), bs.nextMove(toMoves(7), bound));
-        assertEquals(new Move(2), bs.nextMove(toMoves(6), bound));
-        assertEquals(new Move(3), bs.nextMove(toMoves(5), bound));
-        assertEquals(new Move(2), bs.nextMove(toMoves(4), bound));
-        assertEquals(new Move(5), bs.nextMove(toMoves(3), bound));
-        assertEquals(new Move(4), bs.nextMove(toMoves(2), bound));
-        assertEquals(new Move(5), bs.nextMove(toMoves(1), bound));
-        assertEquals(new Move(6), bs.nextMove(toMoves(0), bound));
+        assertEquals(new Move(0), bs.nextMove(toMoves(8), new Bounds(11, 2, 5)));
+        assertEquals(new Move(1), bs.nextMove(toMoves(7), new Bounds(11, 2, 5)));
+        assertEquals(new Move(2), bs.nextMove(toMoves(6), new Bounds(11, 2, 5)));
+        assertEquals(new Move(3), bs.nextMove(toMoves(5), new Bounds(11, 2, 5)));
+        assertEquals(new Move(2), bs.nextMove(toMoves(4), new Bounds(11, 2, 5)));
+        assertEquals(new Move(5), bs.nextMove(toMoves(3), new Bounds(11, 2, 5)));
+        assertEquals(new Move(4), bs.nextMove(toMoves(2), new Bounds(11, 2, 5)));
+        assertEquals(new Move(5), bs.nextMove(toMoves(1), new Bounds(11, 2, 5)));
+        assertEquals(new Move(6), bs.nextMove(toMoves(0), new Bounds(11, 2, 5)));
     }
 
     @Test
     public void testNextMoveOddBound() throws Exception {
         BiSection bs = new BiSection(0, 0);
-        Bounds bounds = new Bounds(11, 3, 5);
 
         assertEquals(new Move(5).withSafeMove(), bs.nextMove(toMoves(11), new Bounds(11, 3, 5))); // <- what to do now ?
         assertEquals(new Move(5).withSafeMove(), bs.nextMove(toMoves(10), new Bounds(11, 3, 5))); // <- what to do now ?
 
-        assertEquals(new Move(0), bs.nextMove(toMoves(8), bounds));
-        assertEquals(new Move(1), bs.nextMove(toMoves(7), bounds));
-        assertEquals(new Move(2), bs.nextMove(toMoves(6), bounds));
-        assertEquals(new Move(3), bs.nextMove(toMoves(5), bounds));
-        assertEquals(new Move(3), bs.nextMove(toMoves(4), bounds)); // <- what to do now ?
-        assertEquals(new Move(5), bs.nextMove(toMoves(3), bounds));
-        assertEquals(new Move(6), bs.nextMove(toMoves(2), bounds));
-        assertEquals(new Move(7), bs.nextMove(toMoves(1), bounds));
-        assertEquals(new Move(8), bs.nextMove(toMoves(0), bounds));
+        assertEquals(new Move(0), bs.nextMove(toMoves(8), new Bounds(11, 3, 5)));
+        assertEquals(new Move(1), bs.nextMove(toMoves(7), new Bounds(11, 3, 5)));
+        assertEquals(new Move(2), bs.nextMove(toMoves(6), new Bounds(11, 3, 5)));
+        assertEquals(new Move(3), bs.nextMove(toMoves(5), new Bounds(11, 3, 5)));
+        assertEquals(new Move(3), bs.nextMove(toMoves(4), new Bounds(11, 3, 5))); // <- what to do now ?
+        assertEquals(new Move(5), bs.nextMove(toMoves(3), new Bounds(11, 3, 5)));
+        assertEquals(new Move(6), bs.nextMove(toMoves(2), new Bounds(11, 3, 5)));
+        assertEquals(new Move(7), bs.nextMove(toMoves(1), new Bounds(11, 3, 5)));
+        assertEquals(new Move(8), bs.nextMove(toMoves(0), new Bounds(11, 3, 5)));
+    }
+
+    @Test
+    public void testErrorCases() throws Exception {
+        BiSection bs = new BiSection(0, 0);
+
+        assertEquals(new Bounds(4, 3, 4), bs.updateBounds(toMoves(new int[] {3, 1, -1}, new Heat[] {Heat.WARMER, Heat.UNKNOWN, Heat.UNKNOWN}), new Bounds(4, 0, 4)));
+        assertEquals(new Move(4), bs.nextMove(toMoves(3), new Bounds(4, 3, 4)));
     }
 
     public Move[] toMoves(int... values) {
