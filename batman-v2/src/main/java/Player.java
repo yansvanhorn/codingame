@@ -26,7 +26,7 @@ class Player {
 
             bs.addHeat(heat);
             MovePair move = bs.findMove();
-            System.err.println(move);
+//            System.err.println(move);
             System.out.println(move.x.v + " " + move.y.v);
         }
     }
@@ -81,7 +81,6 @@ class Move {
         if (v != move.v) return false;
         if (found != move.found) return false;
         return safeMove == move.safeMove;
-
     }
 
     @Override
@@ -105,10 +104,6 @@ class Move {
     public Move withHeat(Heat heat) {
         this.heat = heat;
         return this;
-    }
-
-    public int distance(Move move) {
-        return abs(v - move.v);
     }
 }
 
@@ -244,7 +239,7 @@ class BiSection {
     }
 
     public MovePair findMove() {
-        outputState();
+//        outputState();
 
         MovePair movePair = internalFindMove();
         last = movePair.axis;
