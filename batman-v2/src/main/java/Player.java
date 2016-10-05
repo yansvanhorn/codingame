@@ -6,12 +6,6 @@ import static java.lang.Math.*;
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  */
-enum State {
-    MOVE_ORIGIN,
-    FINDY,
-    FINDX;
-}
-
 class Player {
 
     public static void main(String args[]) {
