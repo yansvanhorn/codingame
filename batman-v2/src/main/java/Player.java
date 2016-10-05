@@ -151,6 +151,7 @@ class Bounds {
                 "lo=" + lo +
                 ", hi=" + hi +
                 ", max=" + max +
+                ", size=" + size() +
                 '}';
     }
 
@@ -253,6 +254,9 @@ class BiSection {
             y[1] = movePair.y;
         }
 
+        System.err.println("xb=" + xb);
+        System.err.println("yb=" + yb);
+
 //        outputState();
         return movePair;
     }
@@ -270,8 +274,8 @@ class BiSection {
         Move nx = nextMove(x, xb);
         Move ny = nextMove(y, yb);
 
-        System.err.println("NextMove X: " + nx);
-        System.err.println("NextMove Y: " + ny);
+        System.err.printf("NextMove X: %s (%d)\n", nx, abs(nx.v - x[1].v));
+        System.err.printf("NextMove Y: %s (%d)\n", ny, abs(ny.v - y[1].v));
 
         if(nx.found && ny.found) {
             return new MovePair(Axis.XY, nx, ny);
@@ -286,10 +290,10 @@ class BiSection {
                 return new MovePair(Axis.Y, x[1], ny);
             }
         } else if (nx.isSafeMove() && !ny.isSafeMove() && !ny.found) {
-            return new MovePair(Axis.Y, x[1], ny);
+            return new MovePair(Axis.Y, nx.found ? nx : x[1], ny);
 
         } else if (!nx.isSafeMove() && ny.isSafeMove() && !nx.found) {
-            return new MovePair(Axis.X, nx, y[1]);
+            return new MovePair(Axis.X, nx, ny.found ? ny : y[1]);
 
         } else {
             return new MovePair(Axis.XY, nx, ny);
