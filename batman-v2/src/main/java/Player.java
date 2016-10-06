@@ -8,6 +8,22 @@ import static java.lang.Math.*;
  */
 class Player {
 
+    BiSection bs;
+
+    public Player(int w, int h, int x, int y) {
+        bs = new BiSection(w - 1, h - 1).withStart(x, y);
+    }
+
+    public Point play(String h) {
+
+        Heat heat = Heat.valueOf(h); // Current distance to the bomb compared to previous distance (COLDER, WARMER, SAME or UNKNOWN)
+
+        bs.addHeat(heat);
+        MovePair move = bs.findMove();
+
+        return new Point(move.x.v, move.y.v);
+    }
+
     public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
         int W = in.nextInt(); // width of the building.
@@ -129,6 +145,10 @@ class Bounds {
 
     public double getMiddle() {
         return ((double) (hi + lo)) / 2;
+    }
+
+    public double getMiddle(int hiNth, int loNth) {
+        return ((double)(hi * hiNth + lo * loNth)) / (hiNth + loNth);
     }
 
     boolean isInMax(int v) {
@@ -290,10 +310,10 @@ class BiSection {
                 return new MovePair(Axis.Y, x[1], ny);
             }
         } else if (nx.isSafeMove() && !ny.isSafeMove() && !ny.found) {
-            return new MovePair(Axis.Y, nx.found ? nx : x[1], ny);
+            return new MovePair(Axis.Y, x[1], ny);
 
         } else if (!nx.isSafeMove() && ny.isSafeMove() && !nx.found) {
-            return new MovePair(Axis.X, nx, ny.found ? ny : y[1]);
+            return new MovePair(Axis.X, nx, y[1]);
 
         } else {
             return new MovePair(Axis.XY, nx, ny);
@@ -301,6 +321,11 @@ class BiSection {
     }
 
     public Bounds updateBounds(Move[] values, Bounds bounds) {
+
+        if(values[1].isSafeMove()) {
+            System.err.println("Not updating bounds. This was safe move!");
+            return bounds;
+        }
 
         switch (values[1].heat) {
             case COLDER: {
@@ -416,7 +441,18 @@ class BiSection {
             return new Move(nv, false);
         }
 
-        return new Move(v > boundMiddleInt ? bound.hi : bound.lo).withSafeMove();
+        // Safe move for both -> calculate optimal
+        System.err.println("Doing optimal safe move!");
+        if(v > boundMiddleInt) {
+            int optimal = (int)floor(bound.getMiddle(11, 5));
+            return new Move(optimal + 1, false).withSafeMove();
+
+        } else {
+            int optimal = (int)ceil(bound.getMiddle(5, 11));
+            return new Move(optimal - 1, false).withSafeMove();
+        }
+
+        //return new Move(v > boundMiddleInt ? bound.hi : bound.lo).withSafeMove();
     }
 
     private void outputState() {
