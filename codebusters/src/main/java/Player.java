@@ -42,18 +42,27 @@ enum Action {
 }
 
 class Command {
-    public static final Command release = new Command(Action.RELEASE);
-    public static final Command idle = new Command(Action.IDLE);
-    public static final Command radar = new Command(Action.RADAR);
+    public static final Command release = new Command(Action.RELEASE, 1);
+    public static final Command idle = new Command(Action.IDLE, 100);
+    public static final Command radar = new Command(Action.RADAR, 1);
 
     private Action action;
     protected Pos pos;
     protected int value;
+    protected int timer;
 
-    protected Command(Action action) {
+    protected Command(Action action, int timer) {
         this.action = action;
+        this.timer = timer;
     }
 
+    public int getTimer() {
+        return timer;
+    }
+
+    public Command tickTimer() {
+        return --timer > 0 ? this : Command.idle;
+    }
 
     public static Command idle() {
         return idle;
@@ -68,27 +77,27 @@ class Command {
     }
 
     public static PosCommand move(Pos pos) {
-        return new PosCommand(Action.MOVE, pos);
+        return new PosCommand(Action.MOVE, pos, 10);
     }
 
     public static PosCommand eject(Pos pos) {
-        return new PosCommand(Action.EJECT, pos);
+        return new PosCommand(Action.EJECT, pos, 1);
     }
 
     public static IntCommand bust(Entity entity) {
-        return new IntCommand(Action.BUST, entity.getEntityId());
+        return new IntCommand(Action.BUST, entity.getEntityId(), 1);
     }
 
     public static IntCommand bust(int id) {
-        return new IntCommand(Action.BUST, id);
+        return new IntCommand(Action.BUST, id, 1);
     }
 
     public static IntCommand stun(Entity entity) {
-        return new IntCommand(Action.STUN, entity.getEntityId());
+        return new IntCommand(Action.STUN, entity.getEntityId(), 1);
     }
 
     public static IntCommand stun(int id) {
-        return new IntCommand(Action.STUN, id);
+        return new IntCommand(Action.STUN, id, 1);
     }
 
     public Action getAction() {
@@ -122,8 +131,8 @@ class Command {
 }
 
 class IntCommand extends Command {
-    public IntCommand(Action action, int value) {
-        super(action);
+    public IntCommand(Action action, int value, int timer) {
+        super(action, timer);
         this.value = value;
     }
 
@@ -135,8 +144,8 @@ class IntCommand extends Command {
 
 class PosCommand extends Command {
 
-    protected PosCommand(Action action, Pos pos) {
-        super(action);
+    protected PosCommand(Action action, Pos pos, int timer) {
+        super(action, timer);
         this.pos = pos;
     }
 
@@ -191,13 +200,12 @@ class Location
     }
 }
 
-interface Pos
-{
+interface Pos {
     int getX();
+
     int getY();
 
-    default double distance(Pos from)
-    {
+    default double distance(Pos from) {
         return Calculate.distance(getX(), getY(), from.getX(), from.getY());
     }
 
@@ -210,15 +218,15 @@ interface Pos
     }
 
     default double length() {
-        return Math.sqrt(getX()*getX() + getY()*getY());
+        return Math.sqrt(getX() * getX() + getY() * getY());
     }
 
     default Pos multiply(double v) {
-        return new Location((int)(getX() * v), (int)(getY() * v));
+        return new Location((int) (getX() * v), (int) (getY() * v));
     }
 
     default Pos divide(double v) {
-        return new Location((int)(getX() / v), (int)(getY() / v));
+        return new Location((int) (getX() / v), (int) (getY() / v));
     }
 
     default Pos add(Pos pos) {
@@ -233,18 +241,16 @@ interface Pos
 
 class Calculate {
 
-    public static double distance(int x, int y, int x2, int y2)
-    {
+    public static double distance(int x, int y, int x2, int y2) {
         return Math.sqrt((x2 - x) * (x2 - x) + (y2 - y) * (y2 - y));
     }
 
-    public static double distance(Pos a, Pos b)
-    {
+    public static double distance(Pos a, Pos b) {
         return distance(a.getX(), a.getY(), b.getX(), b.getY());
     }
 
     public static int findCloser(Pos who, Pos pos1, Pos pos2) {
-        return (int)(distance(who, pos1) - distance(who, pos2));
+        return (int) (distance(who, pos1) - distance(who, pos2));
     }
 
     public static Pos moveToDistance(Pos buster, Pos from, Pos secondaryFrom, int minDistance) {
@@ -269,25 +275,21 @@ class Calculate {
         Pos destination;
         double time;
 
-        public Interception(Pos velocity, Pos destination, double time)
-        {
+        public Interception(Pos velocity, Pos destination, double time) {
             this.velocity = velocity;
             this.destination = destination;
             this.time = time;
         }
 
-        public Pos getVelocity()
-        {
+        public Pos getVelocity() {
             return velocity;
         }
 
-        public Pos getDestination()
-        {
+        public Pos getDestination() {
             return destination;
         }
 
-        public double getTime()
-        {
+        public double getTime() {
             return time;
         }
     }
@@ -299,9 +301,9 @@ class Calculate {
         Pos vInterceptorTarget = interceptor.subtract(target); //target.subtract(interceptor);
         double distance = distance(target, interceptor);
 
-        if(vVelocityTarget.length() < 50) { // low speed go to target directly
+        if (vVelocityTarget.length() < 50) { // low speed go to target directly
             return Optional.empty();
-        } else if(distance < 50) { // close ... move directly
+        } else if (distance < 50) { // close ... move directly
             return Optional.empty();
         }
 
@@ -310,12 +312,12 @@ class Calculate {
         double c = -distance * distance;
 
         Optional<QuadraticSolver.Factor> solution = QuadraticSolver.solve(a, b, c);
-        if(!solution.isPresent()) { // cant intercept
+        if (!solution.isPresent()) { // cant intercept
             return Optional.empty();
         }
 
         Optional<Double> time = solution.get().getSmallestPositive();
-        if(!time.isPresent()) {
+        if (!time.isPresent()) {
             return Optional.empty();
         }
 
@@ -326,23 +328,19 @@ class Calculate {
 }
 
 class QuadraticSolver {
-    static class Factor
-    {
+    static class Factor {
         double v1, v2;
 
-        public Factor(double v1, double v2)
-        {
+        public Factor(double v1, double v2) {
             this.v1 = v1;
             this.v2 = v2;
         }
 
-        public double getV1()
-        {
+        public double getV1() {
             return v1;
         }
 
-        public double getV2()
-        {
+        public double getV2() {
             return v2;
         }
 
@@ -354,18 +352,27 @@ class QuadraticSolver {
 
     public static Optional<Factor> solve(double a, double b, double c) {
 
-        double d = b*b -4 * a * c;
+        double d = b * b - 4 * a * c;
 
-        if (d < 0){
+        if (d < 0) {
             return Optional.empty();
         }
 
-        double v1 = (-b - Math.sqrt(d))/(2*a);
-        double v2 = (-b + Math.sqrt(d))/(2*a);
+        double v1 = (-b - Math.sqrt(d)) / (2 * a);
+        double v2 = (-b + Math.sqrt(d)) / (2 * a);
 
         return Optional.of(new Factor(v1, v2));
     }
 }
+
+/**
+ * - If other guy is my ghost busted by me, then:
+ * - call help,
+ * - if no chance for help then give up?
+ * <p>
+ * - When returning consider help ?
+ * - When returning and buster near our base (on track), use eject
+ */
 
 class Player {
 
@@ -387,6 +394,8 @@ class Player {
         LinkedList<Buster> enemyBusters = gameState.getEnemyBusters();
 
         //LinkedList<GameState> history = new LinkedList<GameState>();
+
+        Roam roam = new Roam(gameState);
 
         while (true) {
             gameState.nextRound();
@@ -410,9 +419,17 @@ class Player {
                 }
             }
 
+            gameState.eliminateMissingGhosts();
+
+            System.err.println(gameState.toString());
+            System.err.println(roam.toString());
+
             for (int i = 0; i < bustersPerPlayer; i++) {
                 final Buster buster = gameState.getOurBusters().get(i);
+
                 System.err.print("-----------------\n" + buster);
+                roam.visit(buster);
+
 
                 Optional<Buster> enemy = Optional.empty();
                 Optional<Ghost> ghost = Optional.empty();
@@ -443,9 +460,10 @@ class Player {
                         }
                     }
                 } else {
-                    // Find one carrying ghost even if possibly can't stun
+
+                    // Find one carrying ghost even if possibly can't stun: TODO: consider if can catch before base ?
                     enemy = gameState.getEnemyBusters().stream()
-                            .filter(e -> e.getState() == State.CARRIES_GHOST)
+                            .filter(e -> e.getState() == State.CARRIES_GHOST && e.getRound() == gameState.getRound())
                             .filter(e -> Calculate.distance(buster, e) < 3500)
                             .filter(e -> Calculate.distance(buster, enemyBase) <= Calculate.distance(e, enemyBase) + 2000) // we have a chance to catch him before base
                             .filter(e -> ourBusters.stream().filter(o -> o.isStunning(e) && o.getState() != State.STUNNED).findFirst().isPresent() == false) // our is not trying to stun him already
@@ -465,7 +483,7 @@ class Player {
                     if (buster.canStun()) {
                         if (!enemy.isPresent()) {
                             enemy = gameState.getEnemyBusters().stream()
-                                    .filter(e -> e.getState() != State.STUNNED)
+                                    .filter(e -> e.getState() != State.STUNNED && e.getRound() == gameState.getRound())
                                     .filter(e -> Calculate.distance(buster, e) < 2500)
                                     .filter(e -> ourBusters.stream().noneMatch(o -> o.isStunning(e) && o.getState() != State.STUNNED)) // our is not trying to stun him already
                                     .min((g1, g2) -> Calculate.findCloser(buster, g1, g2));
@@ -478,26 +496,28 @@ class Player {
                     }
 
                     // If no enemy and ghost present then catch ...
-                    if (!enemy.isPresent()) {
-                        // found in range low on stamin...
-                        ghost = gameState.getGhosts().stream()
-                                .filter(g -> Calculate.distance(buster, g) < 2500)
-                                .min((g1, g2) -> g1.getStamina() - g2.getStamina());
-
-                        ghost.ifPresent(g -> {
-                            buster.moveCloserAnd(g, base, 900, 1760, Command.bust(g));
-                            buster.setInfo("Trap low" + g.getEntityId() + "=" + g.getStamina());
-                        });
-
-                        // found closest
-                        if (!ghost.isPresent()) {
+                    if (gameState.getGhosts().size() > ghostCount * 0.4 || gameState.getRound() > 15) {
+                        if (!enemy.isPresent()) {
+                            // found in range low on stamin...
                             ghost = gameState.getGhosts().stream()
-                                    .min((g1, g2) -> Calculate.findCloser(buster, g1, g2));
+//                                    .filter(g -> Calculate.distance(buster, g) < 4000)
+                                    .min((g1, g2) -> (int) (g1.getStamina() * buster.distance(g1) * base.distance(g1) - g2.getStamina() * buster.distance(g2) * base.distance(g2)));
 
                             ghost.ifPresent(g -> {
                                 buster.moveCloserAnd(g, base, 900, 1760, Command.bust(g));
-                                buster.setInfo("Trap" + g.getEntityId() + "=" + g.getStamina());
+                                buster.setInfo("Trap " + g.getEntityId() + "=" + g.getStamina());
                             });
+
+                            // found lowest
+//                            if (!ghost.isPresent()) {
+//                                ghost = gameState.getGhosts().stream()
+//                                        .min((g1, g2) -> (int)(g1.getStamina() * buster.distance(g1) * base.distance(g1) - g2.getStamina() * buster.distance(g2) * base.distance(g2)));
+//
+//                                ghost.ifPresent(g -> {
+//                                    buster.moveCloserAnd(g, base, 900, 1760, Command.bust(g));
+//                                    buster.setInfo("Trap" + g.getEntityId() + "=" + g.getStamina());
+//                                });
+//                            }
                         }
                     }
 
@@ -517,11 +537,13 @@ class Player {
                     if (buster.isIdle() || buster.hasReachedDestination()) {
 //                        buster.setCommand(Command.move(???));
                         buster.setInfo("Roam");
+                        buster.setCommand(Command.move(roam.roam(buster)));
                     }
                 }
 
 //                System.err.print(buster);
-                System.out.println(buster.outputAction() + " " + buster.getEntityId() + "-" + buster.getInfo()); // MOVE x y | BUST id | RELEASE
+                System.err.println(buster.getInfo());
+                System.out.println(buster.getCommand().toString() + " " + buster.getEntityId() + "-" + buster.getInfo()); // MOVE x y | BUST id | RELEASE
             }
         }
     }
@@ -569,17 +591,16 @@ class Roam {
     }
 
     private void visitQuadrant(Pos pos, int v) {
-        roamVisit[pos.getX()][pos.getY()]+= v;
+        roamVisit[pos.getX()][pos.getY()] += v;
     }
 
     public void visit(Pos pos) {
         Pos q = quadrant.toQ(pos);
         double distance = quadrant.fromQ(q).distance(pos);
 
-        if(distance < Calculate.BUSTER_SPEED / 2) {
+        if (distance < Calculate.BUSTER_SPEED / 2) {
             visitQuadrant(q, 3);
-        }
-        else {
+        } else {
             visitQuadrant(q, 1);
         }
     }
@@ -588,27 +609,19 @@ class Roam {
         return findLeastVisitedQuadrantFor(q, 1, Integer.MAX_VALUE, q);
     }
 
-    private Pos findLeastVisitedQuadrantFor(final Pos q, final int range, int least, Pos leastPos)
-    {
+    private Pos findLeastVisitedQuadrantFor(final Pos q, final int range, int least, Pos leastPos) {
         int xmin = q.getX() - range;
         int xmax = q.getX() + range;
         int ymin = q.getY() - range;
         int ymax = q.getY() + range;
 
-        int[] xvalues = shuffle(IntStream.range(Math.max(0, xmin), Math.min(qx-1, xmax) + 1).toArray());
-        int[] yvalues = shuffle(IntStream.range(Math.max(0, ymin), Math.min(qy-1, ymax) + 1).toArray());
+        int[] xvalues = shuffle(IntStream.range(Math.max(0, xmin), Math.min(qx - 1, xmax) + 1).toArray());
+        int[] yvalues = shuffle(IntStream.range(Math.max(0, ymin), Math.min(qy - 1, ymax) + 1).toArray());
 
-//        int sum = 0;
-//        int count = 0;
-
-        for(int y : yvalues) {
-            for(int x : xvalues) {
-                if(y == ymin || y == ymax || x == xmin || x == xmax) {
-                    System.out.println("x="+x+",y="+y);
-//                    sum += roamVisit[x][y];
-//                    count++;
-
-                    if(least > roamVisit[x][y]) {
+        for (int y : yvalues) {
+            for (int x : xvalues) {
+                if (y == ymin || y == ymax || x == xmin || x == xmax) {
+                    if (least > roamVisit[x][y]) {
                         least = roamVisit[x][y];
                         leastPos = new Location(x, y);
                     }
@@ -616,7 +629,7 @@ class Roam {
             }
         }
 
-        if(range == 5) {
+        if (range == 5) {
             return leastPos;
         }
 
@@ -625,7 +638,7 @@ class Roam {
 
     public int[] shuffle(int[] array) {
         int length = array.length;
-        for(int i = 0; i < array.length; i++) {
+        for (int i = 0; i < array.length; i++) {
             int r = random.nextInt(length);
             int v = array[i];
             array[i] = array[r];
@@ -639,8 +652,7 @@ class Roam {
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         StringBuilder out = new StringBuilder();
         for (int y = 0; y < qy; y++) {
             for (int x = 0; x < qx; x++) {
@@ -654,11 +666,14 @@ class Roam {
 }
 
 class Quadrant {
+//    final int borderx = 1500;
+//    final int bordery = 1500;
+
     final int qx, qy;
-    final int ox;
-    final int oy;
-    final int w = 16000;
-    final int h = 9000;
+    final int ox; // = 1500;
+    final int oy; // = 1500;
+    final int w = 16000; // - borderx * 2;
+    final int h = 9000; // - bordery * 2;
 
     public Quadrant() {
         this(7, 4);
@@ -718,31 +733,38 @@ class GameState {
         return enemyBusters;
     }
 
-    public void updateOurBuster(Buster updatedBuster) {
-        Optional<Buster> buster = ourBusters.stream()
-                .filter(b -> b.getEntityId() == updatedBuster.getEntityId())
-                .findFirst();
-
-        buster.ifPresent(b -> b.update(updatedBuster));
-
-        if (!buster.isPresent()) {
-            ourBusters.add(updatedBuster);
-        }
+    public Buster updateOurBuster(Buster updatedBuster) {
+        return updateBuster(ourBusters, updatedBuster);
     }
 
-    public void updateEnemyBuster(Buster updatedBuster) {
-        Optional<Buster> buster = enemyBusters.stream()
+    public Buster updateEnemyBuster(Buster updatedBuster) {
+        return updateBuster(enemyBusters, updatedBuster);
+    }
+
+    private Buster updateBuster(LinkedList<Buster> busters, Buster updatedBuster) {
+        Optional<Buster> maybeBuster = busters.stream()
                 .filter(b -> b.getEntityId() == updatedBuster.getEntityId())
                 .findFirst();
 
-        buster.ifPresent(b -> b.update(updatedBuster));
+        Buster buster = maybeBuster.isPresent()
+                        ? maybeBuster.get().update(updatedBuster)
+                        : updatedBuster;
 
-        if (!buster.isPresent()) {
-            enemyBusters.add(updatedBuster);
+        if (!maybeBuster.isPresent()) {
+            busters.add(buster);
         }
+
+        if (buster.isCarryingGhost()) {
+            int ghostId = buster.getGhostId();
+            System.err.println("Ghost " + ghostId + " caught. Removing!");
+            ghosts.removeIf(ghost -> ghost.getEntityId() == ghostId);
+        }
+
+        return buster;
     }
 
     public void updateGhost(Ghost updatedGhost) {
+        ghosts.remove(updatedGhost); // Entity equals based on EntityId
         ghosts.add(updatedGhost);
     }
 
@@ -756,7 +778,7 @@ class GameState {
 
     @Override
     public String toString() {
-        return "GameState: Round=" + round + "{" +
+        return "#### GameState: [" + round + "] (ghosts=" + ghosts.size() + " / " + ghostCount + ") ####\n" +
                 "ghosts=" + ghosts +
                 ", ourBusters=" + ourBusters +
                 ", enemyBusters=" + enemyBusters +
@@ -764,7 +786,7 @@ class GameState {
     }
 
     public void nextRound() {
-        ghosts.clear();
+//        ghosts.clear();
         enemyBusters.clear();
 
         round++;
@@ -772,6 +794,16 @@ class GameState {
 
     public int getRound() {
         return round;
+    }
+
+    public void eliminateMissingGhosts() {
+        ghosts.removeIf(ghost -> {
+            boolean shouldRemove = ghost.getRound() < round && ourBusters.stream().anyMatch(buster -> buster.distance(ghost) < 2200);
+            if (shouldRemove) {
+                System.err.println("Ghost not there! Removing " + ghost.getEntityId());
+            }
+            return shouldRemove;
+        });
     }
 }
 
@@ -819,6 +851,26 @@ abstract class Entity
     int getEntityId() {
         return entityId;
     }
+
+    public int getRound() {
+        return round;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Entity entity = (Entity) o;
+
+        return entityId == entity.entityId;
+
+    }
+
+    @Override
+    public int hashCode() {
+        return entityId;
+    }
 }
 
 class Buster
@@ -846,13 +898,13 @@ class Buster
         this.ghostId = ghostId;
     }
 
-    public void update(Buster updatedBuster) {
+    public Buster update(Buster updatedBuster) {
         if (this.entityId != updatedBuster.getEntityId()) {
             throw new RuntimeException("Wrong updatedBuster for assignment");
         }
 
         history.addFirst(this);
-        if(history.size() > Player.HISTORY_SIZE) {
+        if (history.size() > Player.HISTORY_SIZE) {
             history.pollLast();
         }
 
@@ -864,6 +916,10 @@ class Buster
         this.caughtGhost = this.ghostId < 0 && updatedBuster.getGhostId() > -1;
         this.lostGhost = this.ghostId > -1 && updatedBuster.getGhostId() < 0;
         this.ghostId = updatedBuster.getGhostId();
+
+        this.command = this.getCommand().tickTimer();
+
+        return this;
     }
 
     public int getStunCounter() {
@@ -900,8 +956,7 @@ class Buster
         return y;
     }
 
-    public Command getCommand()
-    {
+    public Command getCommand() {
         return command;
     }
 
@@ -919,9 +974,8 @@ class Buster
 
     @Override
     public String toString() {
-        return "Buster{" +
-                "id=" + entityId +
-                ", x=" + x +
+        return "Buster: [" + round + "] (" + entityId + ") {" +
+                "x=" + x +
                 ", y=" + y +
                 ", state=" + state +
                 ", stun=" + stunCounter +
@@ -940,7 +994,7 @@ class Buster
 
     // ------------- IS ---------------------
     public boolean isIdle() {
-        return command == null;
+        return command.getAction() == Action.IDLE;
     }
 
     public boolean isMoving() {
@@ -1026,13 +1080,14 @@ class Ghost
 
     @Override
     public String toString() {
-        return "Ghost{" +
-                "id=" + entityId +
+        return "Ghost: [" + round + "] (" + entityId + ") {" +
                 ", x=" + x +
                 ", y=" + y +
                 ", busters=" + bustersTrapping +
                 ", stamina=" + stamina +
                 "}\n";
     }
+
+
 }
 
