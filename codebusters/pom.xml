@@ -9,11 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>batman-v2</artifactId>
-    <packaging>pom</packaging>
-    <modules>
-        <module>../marketloss</module>
-    </modules>
+    <artifactId>codebusters</artifactId>
 
     <dependencies>
         <dependency>
