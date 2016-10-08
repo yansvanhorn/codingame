@@ -13,10 +13,10 @@ public class RoamTest
         int[] shuffle = roam.shuffle(new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10});
         System.out.println(Arrays.toString(shuffle));
 
-        Pos busterA = new Location(0, 0);
-        Pos busterB = new Location(0, 0);
-        Pos busterC = new Location(0, 0);
-        Pos busterD = new Location(0, 0);
+        Pos busterA = new XY(0, 0);
+        Pos busterB = new XY(0, 0);
+        Pos busterC = new XY(0, 0);
+        Pos busterD = new XY(0, 0);
         Pos roamA = busterA, roamB = busterB, roamC = busterC, roamD = busterD;
 
         Quadrant quadrant = new Quadrant();

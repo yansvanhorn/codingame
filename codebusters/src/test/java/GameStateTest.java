@@ -12,8 +12,8 @@ public class GameStateTest
     public void testMoveBackFrom()
             throws Exception
     {
-        Location buster = new Location(500, 500);
-        Location from = new Location(1500, 1500);
+        XY buster = new XY(500, 500);
+        XY from = new XY(1500, 1500);
         Pos pos = Calculate.moveToDistance(buster, from, from, 1000);
         System.out.println(pos);
         System.out.println(pos.distance(from));
@@ -24,7 +24,7 @@ public class GameStateTest
         System.out.println(collect);
 
         Quadrant quadrant = new Quadrant(16, 9);
-        Pos pos1 = quadrant.toQ(new Location(15001, 8001));
+        Pos pos1 = quadrant.toQ(new XY(15001, 8001));
         Pos pos2 = quadrant.fromQ(pos1);
     }
 }

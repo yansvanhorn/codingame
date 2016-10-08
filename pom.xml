@@ -11,6 +11,7 @@
     <modules>
         <module>batman-v2</module>
         <module>codebusters</module>
+        <module>accountant</module>
     </modules>
 
     <build>

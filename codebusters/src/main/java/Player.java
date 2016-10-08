@@ -155,28 +155,28 @@ class PosCommand extends Command {
     }
 }
 
-class Location
+class XY
         implements Pos {
     int x, y;
 
     static Random random = new Random(new Date().getTime());
 
-    public Location() {
+    public XY() {
         x = random.nextInt(16000);
         y = random.nextInt(9000);
     }
 
-    public Location(int x, int y) {
+    public XY(int x, int y) {
         this.x = x;
         this.y = y;
     }
 
-    public Location(double x, double y) {
+    public XY(double x, double y) {
         this.x = (int) x;
         this.y = (int) y;
     }
 
-    public Location(Pos pos) {
+    public XY(Pos pos) {
         this.x = pos.getX();
         this.y = pos.getY();
     }
@@ -214,7 +214,7 @@ interface Pos {
     }
 
     default Pos subtract(Pos pos) {
-        return new Location(getX() - pos.getX(), getY() - pos.getY());
+        return new XY(getX() - pos.getX(), getY() - pos.getY());
     }
 
     default double length() {
@@ -222,20 +222,20 @@ interface Pos {
     }
 
     default Pos multiply(double v) {
-        return new Location((int) (getX() * v), (int) (getY() * v));
+        return new XY((int) (getX() * v), (int) (getY() * v));
     }
 
     default Pos divide(double v) {
-        return new Location((int) (getX() / v), (int) (getY() / v));
+        return new XY((int) (getX() / v), (int) (getY() / v));
     }
 
     default Pos add(Pos pos) {
-        return new Location(getX() + pos.getX(), getY() + pos.getY());
+        return new XY(getX() + pos.getX(), getY() + pos.getY());
     }
 
     default Pos normalize(int length) {
         double current = this.length();
-        return new Location(getX() * length / current, getY() * length / current);
+        return new XY(getX() * length / current, getY() * length / current);
     }
 }
 
@@ -265,7 +265,7 @@ class Calculate {
             distance = Math.sqrt(x * x + y * y);
         }
 
-        return new Location(from.getX() + x * minDistance / distance, from.getY() + y * minDistance / distance);
+        return new XY(from.getX() + x * minDistance / distance, from.getY() + y * minDistance / distance);
     }
 
     public static final int BUSTER_SPEED = 800;
@@ -623,7 +623,7 @@ class Roam {
                 if (y == ymin || y == ymax || x == xmin || x == xmax) {
                     if (least > roamVisit[x][y]) {
                         least = roamVisit[x][y];
-                        leastPos = new Location(x, y);
+                        leastPos = new XY(x, y);
                     }
                 }
             }
@@ -697,13 +697,13 @@ class Quadrant {
     public Pos toQ(Pos pos) {
         int x = Math.min(pos.getX() * qx / w, qx - 1);
         int y = Math.min(pos.getY() * qy / h, qy - 1);
-        return new Location(x, y);
+        return new XY(x, y);
     }
 
     public Pos fromQ(Pos pos) {
         int x = (pos.getX() * w / qx) + ox;
         int y = (pos.getY() * h / qy) + oy;
-        return new Location(x, y);
+        return new XY(x, y);
     }
 }
 
