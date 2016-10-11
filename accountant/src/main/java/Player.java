@@ -1,4 +1,5 @@
 import java.util.*;
+import java.util.stream.Collector;
 
 import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.toList;
@@ -7,11 +8,9 @@ import static java.util.stream.Collectors.toList;
  * Shoot enemies before they collect all the incriminating data!
  * The closer you are to an enemy, the more damage you do but don't get too close or you'll get killed.
  */
-class Player
-{
+class Player {
 
-    public static void main(String args[])
-    {
+    public static void main(String args[]) {
         Scanner in = new Scanner(System.in);
 
         Wolff wolff = new Wolff();
@@ -49,7 +48,7 @@ class Player
             }
 
             // calculate value
-            datas.forEach(dp -> datas.forEach(dp2 -> dp.addValue(dp2)));
+//            datas.forEach(dp -> datas.forEach(dp2 -> dp.addValue(dp2)));
 
             System.err.println(wolff);
             System.err.println(datas);
@@ -60,22 +59,20 @@ class Player
             if (wolff.neetToRun(enemies)) {
                 System.err.println("Need to run");
                 Optional<Pos> evade = wolff.evade(enemies);
-
                 if (evade.isPresent()) {
                     command = Command.move(evade.get());
-                }
-                else {
+                } else {
                     System.err.println("Nowhere to run ?");
                 }
             }
 
             if (command == null) {
                 Optional<Pos> move = wolff.allowedMoves().stream().
-                        max(comparingInt(p -> moveValue(enemies, p)));
+                        max(comparingInt(p -> optimalMove(datas, p)));
 
                 if (move.isPresent()) {
-                    int moveValueCurrent = moveValue(enemies, wolff);
-                    int moveValue = moveValue(enemies, move.get());
+                    int moveValueCurrent = optimalMove(datas, wolff);
+                    int moveValue = optimalMove(datas, move.get());
 
                     System.err.printf("Current/New value= %d / %d\n", moveValueCurrent, moveValue);
 
@@ -90,8 +87,7 @@ class Player
                 Optional<Enemy> enemy = wolff.canKillBeforeDataPoint(enemies);
                 if (enemy.isPresent()) {
                     command = Command.shoot(enemy.get().getId());
-                }
-                else {
+                } else {
                     System.err.println("No one to shoot?");
                 }
             }
@@ -106,87 +102,89 @@ class Player
         }
     }
 
-    private static int moveValue(LinkedList<Enemy> enemies, Pos p)
-    {
-        return enemies.stream()
-                .mapToInt(e ->
-                                  ((e.turnsToKill(p) < e.turnsFromDataPoint() - 1) ? 100000 : 0) +
-                                  e.willDamageBy(p) +
-                                  ((e.getNexPos().distance(p) <= Wolff.SAFE_DISTANCE) ? -1000000 : 0) +
-                                  ((e.distance(p) <= Wolff.SAFE_DISTANCE) ? -1000000 : 0)
-                )
-                .sum();
+    private static int optimalMove(LinkedList<DataPoint> datas, Pos wolff) {
+
+//        Collector<DataPoint, ?, List<DataPoint>> collector = toList();
+//        datas.stream().sorted(comparingInt((Pos) d -> (int)wolff.distance(d)).reversed()).limit(2).collect(collector);
+
+        int value = datas.stream()
+                .mapToInt(
+                    dp -> {
+                        OptionalInt maxTurnsFromDp = dp.enemies.stream().mapToInt(Enemy::turnsFromDataPoint).max();
+                        if (maxTurnsFromDp.isPresent()) {
+                            int sumTurnsKill = dp.enemies.stream().mapToInt(e -> e.turnsToKillBy(wolff) + 1).sum(); // +1 as we will lose one move if we move
+                            return sumTurnsKill < maxTurnsFromDp.getAsInt()
+                                    ? maxTurnsFromDp.getAsInt() - sumTurnsKill // save the one with least moves first
+                                    : 5000 + maxTurnsFromDp.getAsInt() - sumTurnsKill; // if datapoint cannot be saved right now then give it lower precedence
+                        } else {
+                            return 10000; // if not data point left
+                        }
+                    }
+                ).sum();
+
+        return value;
     }
 }
 
 class Wolff
-        implements Pos
-{
+        implements Pos {
     public static final int SAFE_DISTANCE = 2000;
     public static final int WOLFF_MOVE = 2000;
     int x, y;
 
-    public Wolff updatePos(int x, int y)
-    {
+    public Wolff updatePos(int x, int y) {
         this.x = x;
         this.y = y;
         return this;
     }
 
     @Override
-    public int getX()
-    {
+    public int getX() {
         return x;
     }
 
     @Override
-    public int getY()
-    {
+    public int getY() {
         return y;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "Wolff{" +
                 "x=" + x +
                 ", y=" + y +
                 '}';
     }
 
-    public Optional<Enemy> canKillBeforeDataPoint(LinkedList<Enemy> enemies)
-    {
+    public Optional<Enemy> canKillBeforeDataPoint(LinkedList<Enemy> enemies) {
         return enemies.stream()
-                .filter(e -> e.turnsToKill(this) < e.turnsFromDataPoint())
-                .min(comparingInt(e -> e.turnsToKill(this)));
+                .filter(e -> e.turnsToKillBy(this) < e.turnsFromDataPoint())
+                .min(comparingInt(e -> e.turnsToKillBy(this)));
     }
 
-    public boolean neetToRun(LinkedList<Enemy> enemies)
-    {
+    public boolean neetToRun(LinkedList<Enemy> enemies) {
 
         return enemies.stream()
                 .map(e -> e.getNexPos())
                 .filter(e -> e.distance(this) < SAFE_DISTANCE).findAny().isPresent();
     }
 
-    public Optional<Pos> evade(LinkedList<Enemy> enemies)
-    {
+    public Optional<Pos> evade(LinkedList<Enemy> enemies) {
         List<Pos> enemyPoss = enemies.stream()
                 .flatMap(e -> Arrays.asList(e.getNexPos(), e.getNexPos(2)).stream())
                 .filter(e -> e.distance(this) < SAFE_DISTANCE * 1.5).collect(toList());
 
         Optional<Pos> min = allowedMoves().stream()
                 .max(comparingInt(p -> enemyPoss.stream()
-                             .mapToInt(e -> (int) e.distance(p))
-                             .min()
-                             .getAsInt())
+                        .mapToInt(e -> (int) e.distance(p))
+                        .min()
+                        .getAsInt())
                 );
 
         return min;
     }
 
-    public List<Pos> allowedMoves()
-    {
+    public List<Pos> allowedMoves() {
         LinkedList<Pos> moves = new LinkedList<>();
         int range = SAFE_DISTANCE;
 
@@ -208,78 +206,69 @@ class Wolff
 }
 
 class DataPoint
-        implements Pos
-{
+        implements Pos {
     public static final int DATAPOINT_MAX_VALUE = 100000;
     int id;
     int x, y;
 
     LinkedList<Enemy> enemies = new LinkedList<Enemy>();
 
-    int value = 0;
+//    int value = 0;
 
-    public DataPoint(int id, int x, int y)
-    {
+    public DataPoint(int id, int x, int y) {
         this.id = id;
         this.x = x;
         this.y = y;
     }
 
-    public void addValue(DataPoint dp)
-    {
-        if (dp != this) {
-            value += DATAPOINT_MAX_VALUE / this.distance(dp);
-        }
-    }
+//    public void addValue(DataPoint dp)
+//    {
+//        if (dp != this) {
+//            value += DATAPOINT_MAX_VALUE / this.distance(dp);
+//        }
+//    }
 
-    public void addEnemy(Enemy enemy)
-    {
+    public void addEnemy(Enemy enemy) {
         enemies.add(enemy);
     }
 
     @Override
-    public int getX()
-    {
+    public int getX() {
         return x;
     }
 
     @Override
-    public int getY()
-    {
+    public int getY() {
         return y;
     }
 
-    public int getId()
-    {
+    public int getId() {
         return id;
     }
 
-    public LinkedList<Enemy> getEnemies()
-    {
+    public LinkedList<Enemy> getEnemies() {
         return enemies;
     }
 
-    public int getValue()
-    {
-        return value;
-    }
+//    public int getValue()
+//    {
+//        return value;
+//    }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "DataPoint{" +
                 "id=" + id +
                 ", x=" + x +
                 ", y=" + y +
                 ", enemies=" + enemies.size() +
-                ", value=" + value +
+//                ", value=" + value +
                 "}\n";
     }
 }
 
 class Enemy
-        implements Pos
-{
+        implements Pos {
     public static final double MAX_DAMAGE = 125000;
     public static final int ENEMY_SPEED = 500;
 
@@ -290,79 +279,78 @@ class Enemy
     private int turnsFromDataPoint = Integer.MAX_VALUE;
     private Pos nextPos;
 
-    public Enemy(int id, int life, int x, int y)
-    {
+    public Enemy(int id, int life, int x, int y) {
         this.id = id;
         this.life = life;
         this.y = y;
         this.x = x;
     }
 
-    public int willDamageBy(Pos player)
-    {
-        double distance = this.distance(player);
+    public int willDamageBy(Pos player) {
+        return willDamageBy(this, player);
+    }
+
+    public int willDamageBy(Pos enemy, Pos player) {
+        double distance = enemy.distance(player);
         return (int) (MAX_DAMAGE / Math.pow(distance, 1.2));
+
     }
 
-    public int turnsToKill(Pos player)
-    {
-        int damageBy = willDamageBy(player);
-        return (int) Math.ceil(life / damageBy);
+    public int turnsToKillBy(Pos player) {
+        int lifeLeft = life, rounds = 0;
+        Pos enemyPos = this;
+
+        while (enemyPos.distance(dataPoint) >= 500 && lifeLeft > 0) {
+            enemyPos = getNexPos(++rounds);
+            lifeLeft -= willDamageBy(enemyPos, player);
+        }
+
+        return rounds;
     }
 
-    public int getId()
-    {
+    public int getId() {
         return id;
     }
 
     @Override
-    public int getX()
-    {
+    public int getX() {
         return x;
     }
 
     @Override
-    public int getY()
-    {
+    public int getY() {
         return y;
     }
 
-    public int getLife()
-    {
+    public int getLife() {
         return life;
     }
 
-    public DataPoint getDataPoint()
-    {
+    public DataPoint getDataPoint() {
         return dataPoint;
     }
 
-    public void setDataPoint(DataPoint dataPoint)
-    {
+    public void setDataPoint(DataPoint dataPoint) {
         this.dataPoint = dataPoint;
         dataPoint.addEnemy(this);
         turnsFromDataPoint = (int) Math.ceil((this.distance(dataPoint) - 499) / ENEMY_SPEED);
         nextPos = getNexPos(1);
     }
 
-    public Pos getNexPos()
-    {
+    public Pos getNexPos() {
         return nextPos;
     }
 
-    public Pos getNexPos(int round)
-    {
+    public Pos getNexPos(int round) {
         return this.add(dataPoint.subtract(this).normalize(ENEMY_SPEED).multiply(round));
     }
 
-    public int turnsFromDataPoint()
-    {
+    public int turnsFromDataPoint() {
         return turnsFromDataPoint;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "Enemy{" +
                 "id=" + id +
                 ", x=" + x +
@@ -376,51 +364,43 @@ class Enemy
 }
 
 class XY
-        implements Pos
-{
+        implements Pos {
     int x, y;
 
     static Random random = new Random(new Date().getTime());
 
-    public XY()
-    {
+    public XY() {
         x = random.nextInt(16000);
         y = random.nextInt(9000);
     }
 
-    public XY(int x, int y)
-    {
+    public XY(int x, int y) {
         this.x = x;
         this.y = y;
     }
 
-    public XY(double x, double y)
-    {
+    public XY(double x, double y) {
         this.x = (int) x;
         this.y = (int) y;
     }
 
-    public XY(Pos pos)
-    {
+    public XY(Pos pos) {
         this.x = pos.getX();
         this.y = pos.getY();
     }
 
     @Override
-    public int getX()
-    {
+    public int getX() {
         return x;
     }
 
     @Override
-    public int getY()
-    {
+    public int getY() {
         return y;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "pos{" +
                 "x=" + x +
                 ", y=" + y +
@@ -428,74 +408,60 @@ class XY
     }
 }
 
-interface Pos
-{
+interface Pos {
     int getX();
 
     int getY();
 
-    default double distance(Pos from)
-    {
+    default double distance(Pos from) {
         return Calculate.distance(getX(), getY(), from.getX(), from.getY());
     }
 
-    default int dot(Pos pos)
-    {
+    default int dot(Pos pos) {
         return getX() * pos.getX() + getY() * pos.getY();
     }
 
-    default Pos subtract(Pos pos)
-    {
+    default Pos subtract(Pos pos) {
         return new XY(getX() - pos.getX(), getY() - pos.getY());
     }
 
-    default double length()
-    {
+    default double length() {
         return Math.sqrt(getX() * getX() + getY() * getY());
     }
 
-    default Pos multiply(double v)
-    {
+    default Pos multiply(double v) {
         return new XY((int) (getX() * v), (int) (getY() * v));
     }
 
-    default Pos divide(double v)
-    {
+    default Pos divide(double v) {
         return new XY((int) (getX() / v), (int) (getY() / v));
     }
 
-    default Pos add(Pos pos)
-    {
+    default Pos add(Pos pos) {
         return new XY(getX() + pos.getX(), getY() + pos.getY());
     }
 
-    default Pos normalize(int length)
-    {
+    default Pos normalize(int length) {
         double current = this.length();
         return new XY(getX() * length / current, getY() * length / current);
     }
 }
 
-class Calculate
-{
+class Calculate {
 
-    public static double distance(int x, int y, int x2, int y2)
-    {
+    public static double distance(int x, int y, int x2, int y2) {
         return Math.sqrt((x2 - x) * (x2 - x) + (y2 - y) * (y2 - y));
     }
 
-    public static double distance(Pos a, Pos b)
-    {
+    public static double distance(Pos a, Pos b) {
         return distance(a.getX(), a.getY(), b.getX(), b.getY());
     }
 
-    public static int findCloser(Pos who, Pos pos1, Pos pos2)
-    {
+    public static int findCloser(Pos who, Pos pos1, Pos pos2) {
         return (int) (distance(who, pos1) - distance(who, pos2));
     }
 
-    public static Pos moveToDistance(Pos buster, Pos from, Pos secondaryFrom, int minDistance)
-    {
+    public static Pos moveToDistance(Pos buster, Pos from, Pos secondaryFrom, int minDistance) {
         int x = buster.getX() - from.getX();
         int y = buster.getY() - from.getY();
         double distance = distance(buster, from);
@@ -512,37 +478,31 @@ class Calculate
 
     public static final int BUSTER_SPEED = 800;
 
-    public static class Interception
-    {
+    public static class Interception {
         Pos velocity;
         Pos destination;
         double time;
 
-        public Interception(Pos velocity, Pos destination, double time)
-        {
+        public Interception(Pos velocity, Pos destination, double time) {
             this.velocity = velocity;
             this.destination = destination;
             this.time = time;
         }
 
-        public Pos getVelocity()
-        {
+        public Pos getVelocity() {
             return velocity;
         }
 
-        public Pos getDestination()
-        {
+        public Pos getDestination() {
             return destination;
         }
 
-        public double getTime()
-        {
+        public double getTime() {
             return time;
         }
     }
 
-    public static Optional<Interception> intercept(Pos interceptor, Pos prevTarget, Pos target)
-    {
+    public static Optional<Interception> intercept(Pos interceptor, Pos prevTarget, Pos target) {
         Pos vVelocityTarget = target.subtract(prevTarget);
         double velocityTarget = vVelocityTarget.length();
 
@@ -551,8 +511,7 @@ class Calculate
 
         if (vVelocityTarget.length() < 50) { // low speed go to target directly
             return Optional.empty();
-        }
-        else if (distance < 50) { // close ... move directly
+        } else if (distance < 50) { // close ... move directly
             return Optional.empty();
         }
 
@@ -576,37 +535,30 @@ class Calculate
     }
 }
 
-class QuadraticSolver
-{
-    static class Factor
-    {
+class QuadraticSolver {
+    static class Factor {
         double v1, v2;
 
-        public Factor(double v1, double v2)
-        {
+        public Factor(double v1, double v2) {
             this.v1 = v1;
             this.v2 = v2;
         }
 
-        public double getV1()
-        {
+        public double getV1() {
             return v1;
         }
 
-        public double getV2()
-        {
+        public double getV2() {
             return v2;
         }
 
-        public Optional<Double> getSmallestPositive()
-        {
+        public Optional<Double> getSmallestPositive() {
             double v = Math.min(v1 < 0 ? Double.MAX_VALUE : v1, v2 < 0 ? Double.MAX_VALUE : v2);
             return v != Double.MAX_VALUE ? Optional.of(v) : Optional.empty();
         }
     }
 
-    public static Optional<Factor> solve(double a, double b, double c)
-    {
+    public static Optional<Factor> solve(double a, double b, double c) {
         double d = b * b - 4 * a * c;
 
         if (d < 0) {
@@ -620,82 +572,68 @@ class QuadraticSolver
     }
 }
 
-enum Action
-{
+enum Action {
     MOVE,
     SHOOT;
 }
 
 class Command
-        implements Pos
-{
+        implements Pos {
     private final Action action;
     private int id;
     private int x, y;
 
-    protected Command(Action action, int id)
-    {
+    protected Command(Action action, int id) {
         this.action = action;
         this.id = id;
     }
 
-    public Command(Action action, Pos pos)
-    {
+    public Command(Action action, Pos pos) {
         this.action = action;
         this.x = pos.getX();
         this.y = pos.getY();
     }
 
-    public static Command move(Pos pos)
-    {
+    public static Command move(Pos pos) {
         return new MoveCommand(pos);
     }
 
-    public static Command shoot(int id)
-    {
+    public static Command shoot(int id) {
         return new Command(Action.SHOOT, id);
     }
 
-    public int getId()
-    {
+    public int getId() {
         return id;
     }
 
     @Override
-    public int getY()
-    {
+    public int getY() {
         return y;
     }
 
     @Override
-    public int getX()
-    {
+    public int getX() {
         return x;
     }
 
-    public Action getAction()
-    {
+    public Action getAction() {
         return action;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return action + " " + id;
     }
 }
 
 class MoveCommand
-        extends Command
-{
-    public MoveCommand(Pos pos)
-    {
+        extends Command {
+    public MoveCommand(Pos pos) {
         super(Action.MOVE, pos);
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return getAction() + " " + getX() + " " + getY();
     }
 }
