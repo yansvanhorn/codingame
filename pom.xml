@@ -12,6 +12,7 @@
         <module>batman-v2</module>
         <module>codebusters</module>
         <module>accountant</module>
+        <module>gift</module>
     </modules>
 
     <build>
