@@ -53,19 +53,19 @@ class Player
             }
 
             // sort enemies
-//            datas.forEach(dp -> dp.getEnemies().sort(comparingInt(e -> (int) e.distance(dp))));
+            datas.forEach(dp -> dp.getEnemies().sort(comparingInt(e -> (int) e.distance(dp))));
 
             // calculate value
 //            datas.forEach(dataPoint -> datas.forEach(dp2 -> dataPoint.addValue(dp2)));
 
             System.err.println(wolff);
-            System.err.println(datas);
+//            System.err.println(datas);
             System.err.println(enemies);
 
-//            enemies.forEach(e -> System.err.printf("[%d] damage/Life=%d/%d\n", e.getId(), e.willDamageBy(wolff), e.getLife()));
+            enemies.forEach(e -> System.err.printf("[%d] kill now/+1=%d/%d\n", e.getId(), e.turnsToKillBy(wolff, 0), e.turnsToKillBy(wolff, 1)));
 
             // Need to run ?
-            if (wolff.neetToRun(enemies)) {
+            if (wolff.needToRun(enemies)) {
                 System.err.println("Need to run");
 //                Optional<DataPointsWithValue> evade = finder.find(datas, enemies, wolff);
                 Optional<Pos> evade = wolff.evade(enemies);
@@ -83,6 +83,7 @@ class Player
                 Optional<DataPointsWithValue> maybeDPV = finder.find(datas, enemies, wolff);
                 currentDPV = finder.dataPointsValue(datas, wolff, false);
                 System.err.println("maybeDPV=" + maybeDPV);
+                System.err.println("currentDPV=" + currentDPV);
 
                 if (maybeDPV.isPresent()) {
                     DataPointsWithValue latestDPV = maybeDPV.get();
@@ -112,16 +113,19 @@ class Player
 
                 if (firstDP.isPresent()) {
                     Optional<Enemy> maybeEnemy = firstDP.get().getDataPoint().getEnemies().stream()
-                            .filter(e -> e.turnsFromDataPoint() >= e.turnsToKillBy(wolff))
+                            .filter(e -> e.turnsFromDataPoint() >= e.turnsToKillBy(wolff, 0))
                             .min(comparingInt(Enemy::turnsFromDataPoint));
 
                     if (maybeEnemy.isPresent()) {
-                        System.err.printf("Shoot closest to dp id=%d, turns=%d\n", maybeEnemy.get().getId(), maybeEnemy.get().turnsToKillBy(wolff));
+                        System.err.printf("Shoot closest to dp id=%d, turns=%d\n",
+                                          maybeEnemy.get().getId(),
+                                          maybeEnemy.get().turnsToKillBy(wolff, 0));
+
                         command = Command.shoot(maybeEnemy.get().getId());
                     }
 
                     maybeEnemy = firstDP.get().getDataPoint().getEnemies().stream()
-                            .min(comparingInt(e -> e.turnsToKillBy(wolff)));
+                            .min(comparingInt(e -> e.turnsToKillBy(wolff, 0)));
 
                     if(maybeEnemy.isPresent() && command == null) {
                         System.err.println("Shoot easiest to kill id=" + maybeEnemy.get().getId());
@@ -150,7 +154,7 @@ class OptimalDataPointFinder
     {
         List<DataPointsWithValue> sorted = wolff.allowedMoves().stream()
                 .filter(m -> !enemies.stream() // filter unallowed moves
-                        .filter(e -> min(m.distance(e.getNexPos()), e.distance(m)) <= Wolff.SAFE_DISTANCE)
+                        .filter(e -> min(m.distance(e.getNexPos()), e.distance(m)) <= Wolff.SAFE_DISTANCE * 1.2)
                         .findFirst().isPresent())
                 .map(m -> dataPointsValue(datas, m, true))
 //                .peek(dpv -> System.err.printf("%s value=%d\n", dpv.getWolff(), dpv.getSum()))
@@ -158,21 +162,47 @@ class OptimalDataPointFinder
                 .collect(toList());
 
         int startValue = sorted.get(0).getSum();
-        int tolerance = (int)(startValue * 0.1);
+        int tolerance = (int)Math.abs(startValue * 0.2);
+        int avgDistance = sorted.get(0).getAvgDistance();
 
-//        System.err.println("StartValue=" + startValue);
+        System.err.println("StartValue=" + startValue);
+        System.err.println("Tolerance=" + tolerance);
+        System.err.println("Avgdistance=" + avgDistance);
 //        System.err.println("Sorted:\n" + sorted);
-        Optional<DataPointsWithValue> found = sorted.stream()
-                .filter(dpv -> abs(dpv.getSum() - startValue) < tolerance)
-                .max(comparingInt(dpv -> dpv.getTotalDistance()));
 
+        Optional<DataPointsWithValue> found = Optional.empty();
+
+        if(avgDistance > 6000) {
+            System.err.println("Find when far");
+            found = sorted.stream()
+                    .filter(dpv -> abs(dpv.getSum() - startValue) <= tolerance)
+                    .peek(dpv -> System.err.println(dpv))
+                    .min(comparingInt(dpv -> dpv.getAvgDistance()));
+        }
+
+//        else if (avgDistance > 5000) {
+//            System.err.println("Find when mid");
+//            found = sorted.stream()
+//                    .filter(dpv -> abs(dpv.getSum() - startValue) <= tolerance)
+//                    .min(comparingInt(dpv -> dpv.getAvgDistance()));
+//        }
+
+        else if(avgDistance < 3500) {
+            System.err.println("Find when close");
+            found = sorted.stream()
+                    .filter(dpv -> abs(dpv.getSum() - startValue) <= tolerance)
+                    .peek(dpv -> System.err.println(dpv))
+                    .max(comparingInt(dpv -> dpv.getAvgDistance()));
+        }
+
+//        System.err.println("Found=" + found);
         return found;
     }
 
     public DataPointsWithValue dataPointsValue(List<DataPoint> datas, Pos wolff, boolean needToMove)
     {
         List<DataPointWithValue> dataPointsWithValue = datas.stream()
-                .map(dp -> new DataPointWithValue(dp, dataPointValue(dp, wolff, true)))
+                .map(dp -> new DataPointWithValue(dp, dataPointValue(dp, wolff, needToMove)))
                 .collect(toList());
 
         return new DataPointsWithValue(wolff, dataPointsWithValue).sort();
@@ -180,8 +210,8 @@ class OptimalDataPointFinder
 
     private int dataPointValue(DataPoint dp, Pos wolff, boolean needToMove)
     {
-        int killTurns = 0;
-        int distanceSum = 0;
+        int killTurnsSum = 0;
+//        int distanceSum = 0;
         boolean canBeSaved = true;
 
         int size = dp.getEnemies().size();
@@ -189,18 +219,20 @@ class OptimalDataPointFinder
             return 10000;
         }
 
+        int minTurnsFromDataPoint = Integer.MAX_VALUE;
         for (Enemy e : dp.getEnemies()) {
-            int turnsFromDataPoint = e.turnsFromDataPoint() - (needToMove ? -1 : 0);
-            int turnsToKill = e.turnsToKillBy(wolff);
+            int turnsFromDataPoint = e.turnsFromDataPoint() - (needToMove ? 1 : 0);
+            int turnsToKill = e.turnsToKillBy(wolff, needToMove ? 1 : 0);
 
-            if (turnsToKill + killTurns > turnsFromDataPoint) {
+            if (turnsToKill + killTurnsSum > turnsFromDataPoint) {
                 canBeSaved = false;
             }
-            distanceSum += turnsFromDataPoint;
-            killTurns += turnsToKill;
+//            distanceSum += turnsFromDataPoint;
+            minTurnsFromDataPoint = min(minTurnsFromDataPoint, turnsFromDataPoint);
+            killTurnsSum += turnsToKill;
         }
 
-        int value = killTurns - distanceSum + (canBeSaved ? 0 : 5000);
+        int value = killTurnsSum + minTurnsFromDataPoint + (canBeSaved ? 0 : 5000);
 
         return value;
     }
@@ -211,7 +243,7 @@ class DataPointsWithValue
     private Pos wolff;
     private List<DataPointWithValue> dataPointWithValues;
     private int sum;
-    private int totalDistance = -1;
+    private int avgDistance = -1;
 
     public DataPointsWithValue()
     {
@@ -247,17 +279,17 @@ class DataPointsWithValue
         return sum;
     }
 
-    public int getTotalDistance()
+    public int getAvgDistance()
     {
-        if (totalDistance < 0) {
-            totalDistance = (int) this.dataPointWithValues
+        if (avgDistance < 0) {
+            avgDistance = (int) this.dataPointWithValues
                     .stream()
                     .flatMap(dpv -> dpv.getDataPoint().getEnemies().stream())
                     .mapToInt(e -> (int) e.distance(wolff))
                     .average().orElseGet(() -> 0);
         }
 
-        return totalDistance;
+        return avgDistance;
     }
 
     public Pos getWolff()
@@ -269,9 +301,10 @@ class DataPointsWithValue
     public String toString()
     {
         return "DataPointsWithValue{" +
-                "totalDistance=" + totalDistance +
+                "wolff=" + wolff +
                 ", sum=" + sum +
-                ", wolff=" + wolff +
+                ", avgDistance=" + avgDistance +
+                ", dataPointWithValues=" + dataPointWithValues +
                 "}\n";
     }
 }
@@ -295,6 +328,15 @@ class DataPointWithValue
     public int getValue()
     {
         return value;
+    }
+
+    @Override
+    public String toString()
+    {
+        return "DataPointWithValue{" +
+                "dataPoint=" + dataPoint.getId() +
+                ", value=" + value +
+                '}';
     }
 }
 
@@ -333,14 +375,14 @@ class Wolff
                 '}';
     }
 
-    public Optional<Enemy> canKillBeforeDataPoint(LinkedList<Enemy> enemies)
-    {
-        return enemies.stream()
-                .filter(e -> e.turnsToKillBy(this) < e.turnsFromDataPoint())
-                .min(comparingInt(e -> e.turnsToKillBy(this)));
-    }
+//    public Optional<Enemy> canKillBeforeDataPoint(LinkedList<Enemy> enemies)
+//    {
+//        return enemies.stream()
+//                .filter(e -> e.turnsToKillBy(this) < e.turnsFromDataPoint())
+//                .min(comparingInt(e -> e.turnsToKillBy(this)));
+//    }
 
-    public boolean neetToRun(LinkedList<Enemy> enemies)
+    public boolean needToRun(LinkedList<Enemy> enemies)
     {
         return enemies.stream()
                 .map(e -> e.getNexPos())
@@ -351,7 +393,7 @@ class Wolff
     {
         List<Pos> enemyPoss = enemies.stream()
                 .flatMap(e -> Arrays.asList(e.getNexPos(), e.getNexPos(2)).stream())
-                .filter(e -> e.distance(this) < SAFE_DISTANCE * 1.5).collect(toList());
+                .filter(e -> e.distance(this) < SAFE_DISTANCE * 1.75).collect(toList());
 
         Optional<Pos> min = allowedMoves().stream()
                 .max(comparingInt(p -> enemyPoss.stream()
@@ -489,13 +531,13 @@ class Enemy
 
     }
 
-    public int turnsToKillBy(Pos player)
+    public int turnsToKillBy(Pos player, int futureRounds)
     {
         int lifeLeft = life, rounds = 0;
 //        Pos enemyPos = this;
 
         while (lifeLeft > 0) {
-            Pos enemyPos = getNexPos(++rounds);
+            Pos enemyPos = getNexPos(++rounds + futureRounds);
             lifeLeft -= willDamageBy(enemyPos, player);
         }
 
